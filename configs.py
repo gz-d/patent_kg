@@ -2,6 +2,8 @@
 
 huggingface_token = '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'
 
+tgi_host = "http://localhost:8080"
+
 neo4j_host = "bolt://localhost:7687"
 neo4j_user = "neo4j"
 neo4j_password = "12345678"

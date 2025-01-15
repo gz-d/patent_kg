@@ -31,6 +31,11 @@ create a database for receiving graph database. if you use default config create
 ```shell
 model=Qwen/Qwen2.5-7B-Instruct
 docker pull ghcr.io/huggingface/text-generation-inference
-docker run --gpus all --shm-size 1g -p 8080:80 -v <home>/.cache/huggingface:/data ghcr.io/huggingface/text-generation-inference --model-id $model
+docker run --gpus all --shm-size 1g -e CUDA_VISIBLE_DEVICES=4,5,6,7 -p 8080:80 -v <home>/.cache/huggingface:/data ghcr.io/huggingface/text-generation-inference --model-id $model --max-input-length 52207 --max-batch-prefill-tokens 52207 --max-total-tokens 131072 --max-batch-size 32 --num-shard 4
 ```
 
+## Load documents into graph database
+
+```shell
+python3 load_graphdb.py --input_dir patents
+```

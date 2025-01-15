@@ -19,7 +19,7 @@ FLAGS = flags.FLAGS
 def add_options():
   flags.DEFINE_string('input_dir', default = None, help = 'path to directory')
   flags.DEFINE_boolean('split', default = False, help = 'whether to split document')
-  flags.DEFINE_enum('model', default = 'llama3', enum_values = {'llama3', 'qwen2'}, help = 'which LLM to use')
+  flags.DEFINE_enum('model', default = 'qwen2', enum_values = {'llama3', 'qwen2'}, help = 'which LLM to use')
 
 def main(unused_argv):
   prompt = extract_triplets_template(node_types, rel_types)

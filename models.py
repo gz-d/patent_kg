@@ -7,13 +7,14 @@ import random
 import string
 from langchain import hub
 from transformers import AutoTokenizer
+from langchain_community.llms import HuggingFaceTextGenInference
 from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.agents.format_scratchpad.tools import format_to_tool_messages
 from langchain.agents.output_parsers import ToolsAgentOutputParser
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.messages import HumanMessage, ToolMessage
-from configs import huggingface_token
+from configs import huggingface_token, tgi_host
 
 class ChatHuggingFace2(ChatHuggingFace):
   def generate_random_sequence(self, length = 24):
@@ -111,17 +112,11 @@ class Qwen2_5(ChatHuggingFace2):
   def __init__(self,):
     environ['HUGGINGFACEHUB_API_TOKEN'] = huggingface_token
     super(ChatHuggingFace, self).__init__(
-      llm = HuggingFaceEndpoint(
-        endpoint_url = "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-1.5B-Instruct",
-        huggingfacehub_api_token = huggingface_token,
-        task = "text-generation",
-        do_sample = False,
+      llm = HuggingFaceTextGenInference(
+        inference_server_url = tgi_host,
         top_p = 0.8,
         temperature = 0.8,
-        model_kwargs = {
-          'max_length': 131072,
-          'use_cache': True
-        }
+        do_sample = False
       ),
       tokenizer = AutoTokenizer.from_pretrained('Qwen/Qwen2.5-1.5B-Instruct'),
       verbose = True
@@ -131,7 +126,7 @@ class CodeQwen2(ChatHuggingFace2):
   def __init__(self,):
     environ['HUGGINGFACEHUB_API_TOKEN'] = huggingface_token
     super(ChatHuggingFace, self).__init__(
-      llm = HuggingFaceEndpoint(
+      llm = HuggingFaceTextGenInference(
         endpoint_url = "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-Coder-3B-Instruct",
         huggingfacehub_api_token = huggingface_token,
         task = "text-generation",
