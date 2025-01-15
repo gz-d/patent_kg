@@ -1,5 +1,15 @@
 #!/usr/bin/python3
 
+huggingface_token = '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'
+
+neo4j_host = "bolt://localhost:7687"
+neo4j_user = "neo4j"
+neo4j_password = "12345678"
+neo4j_db = "neo4j"
+
+use_fewshot = False
+use_selector = False
+
 node_types = ['Patent', 'Inventor', 'Applicant', 'Agent', 'Technical Field', 'Patent Owner', 'Patent Citation']
 
 rel_types = [
