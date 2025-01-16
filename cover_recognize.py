@@ -20,7 +20,6 @@ def main(unused_argv):
   page = pdf[0]
   pix = page.get_pixmap(dpi=200)
   pix.save('cover.png')
-  return
 
   # 2) load tokenizer and LLM
   tokenizer = AutoTokenizer.from_pretrained(
