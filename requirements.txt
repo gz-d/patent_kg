@@ -40,3 +40,4 @@ json-repair
 langchain_experimental
 neo4j
 pillow_heif
+pymupdf
