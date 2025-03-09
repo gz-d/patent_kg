@@ -5,7 +5,7 @@ from langchain.agents.format_scratchpad import format_log_to_str
 from langchain.agents.output_parsers import ReActJsonSingleInputOutputParser
 from langchain.tools.render import render_text_description
 from langchain_neo4j import Neo4jVector
-from models import Llama3_2, Qwen2_5
+from models import Llama3_2, Qwen2_5, GPT35Turbo, GPT4O
 from tools import load_chunk_retriever, load_document_retriever
 from prompts import react_prompt
 
@@ -13,7 +13,9 @@ class Agent(object):
   def __init__(self, model = 'llama3', **kwargs):
     llms_types = {
       'llama3': Llama3_2,
-      'qwen2': Qwen2_5
+      'qwen2': Qwen2_5,
+      'gpt3.5': GPT35Turbo,
+      'gpt4o': GPT4O,
     }
     llm = llms_types[model]()
     vectordb = Neo4jVector(
@@ -28,6 +30,11 @@ class Agent(object):
     tools = [load_chunk_retriever(vectordb),
              load_document_retriever(vectordb)]
     prompt = react_prompt
+    # adapt prompt to openai's preference
+    if model in ['gpt3.5', 'gpt4o']:
+      for i in range(len(prompt)):
+        if prompt[i][0] == 'user':
+          prompt[i] = ('human', prompt[i][1])
     prompt = prompt.partial(
       tools = render_text_description(tools),
       tool_names = ", ".join([t.name for t in tools])

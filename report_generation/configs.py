@@ -12,4 +12,6 @@ service_port = 8081
 
 huggingface_token = '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'
 
+openai_api_key = '' # FIXME: fill in the api key
+
 tgi_host = 'http://localhost:8080'
