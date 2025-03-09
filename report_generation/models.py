@@ -20,7 +20,7 @@ from configs import *
 class Llama3_2(ChatHuggingFace):
   def __init__(self,):
     environ['HUGGINGFACEHUB_API_TOKEN'] = huggingface_token
-    super(ChatHuggingFace, self).__init__(
+    super(Llama3_2, self).__init__(
       llm = HuggingFaceTextGenInference(
         inference_server_url = tgi_host,
         do_sample = False,
@@ -34,7 +34,7 @@ class Llama3_2(ChatHuggingFace):
 class Qwen2_5(ChatHuggingFace):
   def __init__(self,):
     environ['HUGGINGFACEHUB_API_TOKEN'] = huggingface_token
-    super(ChatHuggingFace, self).__init__(
+    super(Qwen2_5, self).__init__(
       llm = HuggingFaceTextGenInference(
         inference_server_url = tgi_host,
         do_sample = False,
