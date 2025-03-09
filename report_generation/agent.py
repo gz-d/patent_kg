@@ -5,7 +5,7 @@ from langchain.agents.format_scratchpad import format_log_to_str
 from langchain.agents.output_parsers import ReActJsonSingleInputOutputParser
 from langchain.tools.render import render_text_description
 from langchain_neo4j import Neo4jVector
-from models import Llama3_2, Qwen2_5, GPT35Turbo, GPT4O
+from models import Llama3_2, Qwen2_5, GPT35Turbo, GPT4O, Campus
 from tools import load_chunk_retriever, load_document_retriever
 from prompts import react_prompt
 
@@ -16,6 +16,7 @@ class Agent(object):
       'qwen2': Qwen2_5,
       'gpt3.5': GPT35Turbo,
       'gpt4o': GPT4O,
+      'campus': Campus,
     }
     llm = llms_types[model]()
     vectordb = Neo4jVector(

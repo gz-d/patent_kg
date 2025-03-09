@@ -61,6 +61,17 @@ class GPT4O(ChatOpenAI):
       api_key = openai_api_key,
     )
 
+class Campus(ChatOpenAI):
+  def __init__(self,):
+    super(ChatOpenAI, self).__init__(
+      model_name = '/llm_models/Qwen2.5-14B-Instruct',
+      base_url = "http://192.168.2.143:17000",
+      api_key = campus_api_key,
+      top_p = 0.6,
+      temperature = 0.1,
+      max_tokens = 8192,
+    )
+
 if __name__ == "__main__":
   from langchain_core.tools import tool
   from langchain.agents import AgentExecutor, create_tool_calling_agent

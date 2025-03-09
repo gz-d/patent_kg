@@ -9,7 +9,7 @@ from configs import *
 FLAGS = flags.FLAGS
 
 def add_options():
-  flags.DEFINE_enum('model', default = 'qwen2', enum_values = {'llama3', 'qwen2', 'gpt3.5', 'gpt4o'}, help = 'model to use')
+  flags.DEFINE_enum('model', default = 'qwen2', enum_values = {'llama3', 'qwen2', 'gpt3.5', 'gpt4o', 'campus'}, help = 'model to use')
 
 def create_interface():
   agent = Agent(model = FLAGS.model, host = neo4j_host, username = neo4j_user, password = neo4j_password, db = neo4j_db)
