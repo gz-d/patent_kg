@@ -37,7 +37,7 @@ def main(unused_argv):
       response = model.inference("""the given picture is the cover of a patent. please extract the information of the patent in the following json format:
 
 {
-  "patent_id": <patent id>,
+  "patent_num": <patent id>,
   "patent_name": <patent name>,
   "applicant": <applicant name in string format>,
   "inventors": [<inventor1 in string format>, <inventor2 in string format>, ...],
