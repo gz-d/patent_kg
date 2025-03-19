@@ -1,14 +1,13 @@
 #!/usr/bin/python3
 
-huggingface_token = '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'
-# huggingface_token = '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'
+huggingface_token = '
 
-tgi_host = "http://localhost:9091"
+tgi_host = ""
 
-neo4j_host = "bolt://localhost:7687"
-neo4j_user = "neo4j"
-neo4j_password = "12345678"
-neo4j_db = "neo4j"
+neo4j_host = ""
+neo4j_user = ""
+neo4j_password = ""
+neo4j_db = ""
 
 use_fewshot = False
 use_selector = False
