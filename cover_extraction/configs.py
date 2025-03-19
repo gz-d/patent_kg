@@ -3,8 +3,8 @@
 dashscope_api_key = ''
 tgi_host = ""
 huggingface_token = ''
-host = "0.0.0.0"
-port = 8081
+host = ""
+port = 
 
 neo4j_host = ""
 neo4j_user = ""
