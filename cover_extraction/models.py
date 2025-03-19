@@ -13,8 +13,7 @@ import tempfile
 import zlib
 from transformers import AutoModelForCausalLM, AutoTokenizer, AutoProcessor
 
-# deepseek_vl2_path = "/home/guanzhideng145/research/ip_portal/patent_kg/cover_extraction/DeepSeek-VL2"
-sys.path.append("/home/guanzhideng145/research/ip_portal/patent_kg/cover_extraction/DeepSeek-VL2")
+sys.path.append("PATH to DeepSeek-VL2")
 from deepseek_vl2.models.processing_deepseek_vl_v2 import DeepseekVLV2Processor
 from deepseek_vl2.models.modeling_deepseek_vl_v2 import DeepseekVLV2ForCausalLM
 from deepseek_vl2.utils.io import load_pil_images
@@ -22,16 +21,6 @@ from deepseek_vl2.utils.io import load_pil_images
 
 class VQA(ABC):
   def encode_img(self, image):
-    # if type(image) is str:
-    #   image = cv2.imread(image)
-    # else:
-    #   assert type(image) is np.ndarray
-    # success, encoded_image = cv2.imencode('.png', image)
-    # assert success, "failed to encode numpy to png image!"
-    # png_bytes = encoded_image.tobytes()
-    # png_b64 = base64.b64encode(png_bytes).decode('utf-8')
-    # return png_b64
-    # 如果是字符串路径，读取图片
     if isinstance(image, str):
       image = cv2.imread(image)
     else:
@@ -43,7 +32,7 @@ class VQA(ABC):
     img_pil.thumbnail(max_size)
 
     img_bytes = io.BytesIO()
-    img_pil.save(img_bytes, format='JPEG', quality=50)  # JPEG 质量压缩
+    img_pil.save(img_bytes, format='JPEG', quality=50)
     img_bytes = img_bytes.getvalue()
 
     img_b64 = base64.b64encode(img_bytes).decode('utf-8')
@@ -166,7 +155,6 @@ class DeepSeek_VL2_transformers(VQA):
       {"role": "<|Assistant|>", "content": ""},
     ]
     pil_images = load_pil_images(conversation)
-    # 确保 PIL 图片正确加载
     if not pil_images:
       raise ValueError("Error: Image loading failed! Check `load_pil_images()`.")
 
@@ -182,24 +170,11 @@ class DeepSeek_VL2_transformers(VQA):
     # run image encoder to get the image embeddings
     inputs_embeds = self.vl_gpt.prepare_inputs_embeds(**prepare_inputs)
 
-    # 检查 inputs_embeds 是否为空
     if inputs_embeds is None or inputs_embeds.nelement() == 0:
       raise ValueError("Error: inputs_embeds is empty! Check image processing.")
 
     print(f"Debug: inputs_embeds shape: {inputs_embeds.shape}")
 
-    # # outputs = self.vl_gpt.language_model.generate(
-    # outputs = self.vl_gpt.language.generate(
-    #   inputs_embeds=inputs_embeds,
-    #   attention_mask=prepare_inputs.attention_mask,
-    #   pad_token_id=self.tokenizer.eos_token_id,
-    #   bos_token_id=self.tokenizer.bos_token_id,
-    #   eos_token_id=self.tokenizer.eos_token_id,
-    #   max_new_tokens=512,
-    #   do_sample=False,
-    #   use_cache=True
-    # )
-    # run the model to get the response
     outputs = self.vl_gpt.generate(
       inputs_embeds=inputs_embeds,
       input_ids=prepare_inputs.input_ids,
