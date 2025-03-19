@@ -125,21 +125,7 @@ class Qwen2_5(ChatHuggingFace2):
 class Qwen2():
   def __init__(self, tgi_host="http://localhost:9091"):
     from huggingface_hub import InferenceClient
-    # environ['HUGGINGFACEHUB_API_TOKEN'] = huggingface_token
     self.client = InferenceClient(tgi_host)
-    # super(ChatHuggingFace, self).__init__(
-    #   llm=HuggingFaceTextGenInference(
-    #     inference_server_url=tgi_host,
-    #     top_p=0.8,
-    #     temperature=0.8,
-    #     do_sample=False
-    #   ),
-    #   tokenizer=AutoTokenizer.from_pretrained('Qwen/Qwen2-7B-Instruct'),
-    #   verbose=True
-    # )
-  # def __init__(self, tgi_host="http://localhost:9091"):
-  #   from huggingface_hub import InferenceClient
-  #   self.client = InferenceClient(tgi_host)
 
   def inference(self, patent_text, system_message=None):
     messages = list()
