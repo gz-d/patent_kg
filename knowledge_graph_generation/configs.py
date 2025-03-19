@@ -1,8 +1,9 @@
 #!/usr/bin/python3
 
-huggingface_token = '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'
+huggingface_token = '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'
+# huggingface_token = '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'
 
-tgi_host = "http://localhost:8080"
+tgi_host = "http://localhost:9091"
 
 neo4j_host = "bolt://localhost:7687"
 neo4j_user = "neo4j"

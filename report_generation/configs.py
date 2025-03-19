@@ -7,12 +7,14 @@ neo4j_db = 'patents'
 
 max_history_len = 5
 
-service_host = 'localhost'
+# service_host = 'localhost'
+service_host = '0.0.0.0'
 service_port = 8081
 
-huggingface_token = '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'
+# huggingface_token = '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'
+huggingface_token = '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'
 
 openai_api_key = '' # FIXME: fill in the api key
 campus_api_key = '' # FIXME: fill in the api key
 
-tgi_host = 'http://localhost:8080'
+tgi_host = 'http://localhost:9090'

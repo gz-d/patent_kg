@@ -12,28 +12,36 @@ from langchain_neo4j import Neo4jGraph
 from langchain_experimental.graph_transformers.llm import LLMGraphTransformer
 from configs import neo4j_host, neo4j_user, neo4j_password, neo4j_db, node_types, rel_types
 from prompts import extract_triplets_template
-from models import Llama3_2, Qwen2_5
+from models import Llama3_2, Qwen2_5, Qwen2, DeepSeekR1Qwen15B
+from neo4j import GraphDatabase
+import time
+import re
 
 FLAGS = flags.FLAGS
 
 def add_options():
   flags.DEFINE_string('input_dir', default = None, help = 'path to directory')
+  flags.DEFINE_string('neo4j_db', default='testkg', help='neo4j database')
   flags.DEFINE_boolean('split', default = False, help = 'whether to split document')
-  flags.DEFINE_enum('model', default = 'qwen2', enum_values = {'llama3', 'qwen2'}, help = 'which LLM to use')
+  flags.DEFINE_enum('model', default = 'qwen2', enum_values = {'llama3', 'qwen2', 'deepseek'}, help = 'which LLM to use')
 
 def main(unused_argv):
-  prompt = extract_triplets_template(node_types, rel_types)
+  driver = GraphDatabase.driver(neo4j_host, auth=(neo4j_user, neo4j_password))
+  pattern = r'```json\s*(\{.*?\})\s*```|(\{.*?\})'
+  # prompt = extract_triplets_template(node_types, rel_types)
   llm = {
     'llama3': Llama3_2,
-    'qwen2': Qwen2_5
+    # 'qwen2': Qwen2_5
+    'qwen2': Qwen2,
+    'deepseek': DeepSeekR1Qwen15B,
   }[FLAGS.model]()
-  graph_transformer = LLMGraphTransformer(
-    llm = llm,
-    prompt = prompt,
-    allowed_nodes = node_types,
-    allowed_relationships = rel_types,
-  )
-  neo4j = Neo4jGraph(url = neo4j_host, username = neo4j_user, password = neo4j_password, database = neo4j_db)
+  # graph_transformer = LLMGraphTransformer(
+  #   llm = llm,
+  #   prompt = prompt,
+  #   allowed_nodes = node_types,
+  #   allowed_relationships = rel_types,
+  # )
+  # neo4j = Neo4jGraph(url = neo4j_host, username = neo4j_user, password = neo4j_password, database = FLAGS.neo4j_db)
   if FLAGS.split:
     text_splitter = RecursiveCharacterTextSplitter(separators = [r"\n\n", r"\n", r"\.(?![0-9])|(?<![0-9])\.", r"。"], is_separator_regex = True, chunk_size = 150, chunk_overlap = 10)
   for root, dirs, files in tqdm(walk(FLAGS.input_dir)):
@@ -50,9 +58,90 @@ def main(unused_argv):
       docs = loader.load()
       if FLAGS.split:
         docs = text_splitter.split_documents(docs)
-      graph = graph_transformer.convert_to_graph_documents(docs)
-      neo4j.add_graph_documents(graph)
+      patent_text = "\n".join([doc.page_content for doc in docs])
+      print(patent_text)
+      # graph = graph_transformer.convert_to_graph_documents(docs)
+      # neo4j.add_graph_documents(graph)
+      prompt = """The given text is the text of a patent, extracted by OCR. Please extract the information of the patent in the following json format:
+
+      {
+        "patent_num": <patent id>,
+        "patent_name": <patent name>,
+        "applicant": <applicant name in string format>,
+        "inventors": [<inventor1 in string format>, <inventor2 in string format>, ...],
+        "assignee": <assignee name in string format>,
+        "cited_patents": [<cited patent num1>, <cited patent num2>, ...],
+        "fields of classification search": [<field1>, <field2>]
+      }
+
+      During the extraction process, use "City University of Hong Kong" to replace alias such as "City University of Hong Kong (HK)",
+      "City University of Hong Kong, Kowloon (HK)", "City University of Hong Kong, Hong Kong (CN)", "香港城市大学", or any other 
+      name that refers to City University of Hong Kong."""
+      try:
+        response = llm.inference(patent_text, prompt)
+        print(f"OCR+LLM: {response}")
+      except Exception as e:
+        print(f"OCR+LLM 处理失败：{e}")
+
+      # matches = re.findall(pattern, response, re.DOTALL)
+      # print(matches)
+      # if len(matches) < 1:
+      #   print("未找到有效JSON结构")
+      #   continue
+
+      # 解析 JSON，确保 `info` 不为空
+      info = None
+      try:
+        # info = json.loads(matches[0][0])
+        info = json.loads(response)
+        # print(type(info))
+        # print(info)
+        print("解析出的专利信息:", json.dumps(info, indent=2, ensure_ascii=False))
+      except Exception as e:
+        print(f"JSON 解析失败: {e}")
+        continue
+
+      if not info or 'patent_num' not in info or 'patent_name' not in info or info['patent_num'] is None or info['patent_name'] is None:
+        print("JSON 数据不完整，跳过")
+        continue
+
+      print(f"✅ 存入 Neo4j: {info['patent_num']} - {info['patent_name']}")
+
+      driver.execute_query('merge (a: Patent {patent_num: $pno, patent_name: $pnm}) return a;', pno=info['patent_num'],
+                           pnm=info['patent_name'], database_=FLAGS.neo4j_db)
+      if 'applicant' in info and info['applicant']:
+        driver.execute_query('merge (a: Applicant {name: $name}) return a;', name=info['applicant'],
+                             database_=FLAGS.neo4j_db)
+        driver.execute_query(
+          'match (a: Patent {patent_num: $pno}), (b: Applicant {name: $name}) merge (a)<-[:APPLY]-(b);',
+          pno=info['patent_num'], name=info['applicant'], database_=FLAGS.neo4j_db)
+      if 'inventors' in info and len(info['inventors']):
+        for inventor in info['inventors']:
+          driver.execute_query('merge (a: Inventor {name: $name}) return a;', name=inventor, database_=FLAGS.neo4j_db)
+          driver.execute_query(
+            'match (a: Patent {patent_num: $pno}), (b: Inventor {name: $name}) merge (a)<-[:INVENT]-(b);',
+            pno=info['patent_num'], name=inventor, database_=FLAGS.neo4j_db)
+      if 'assignee' in info and info['assignee']:
+        driver.execute_query('merge (a: Assignee {name: $name}) return a;', name=info['assignee'],
+                             database_=FLAGS.neo4j_db)
+        driver.execute_query(
+          'match (a: Assignee {name: $name}), (b: Patent {patent_num: $pno}) merge (a)<-[:ASSIGN]-(b);',
+          name=info['assignee'], pno=info['patent_num'], database_=FLAGS.neo4j_db)
+      if 'fields' in info and len(info['fields']):
+        for field in info['fields']:
+          driver.execute_query('merge (a: Field {name: $name}) return a;', name=field, database_=FLAGS.neo4j_db)
+          driver.execute_query(
+            'match (a: Patent {patent_num: $pno}), (b: Field {name: $name}) merge (a)-[:BELONGS_TO]-(b);',
+            pno=info['patent_num'], name=field, database_=FLAGS.neo4j_db)
 
 if __name__ == "__main__":
+  start = time.time()
   add_options()
-  app.run(main)
+
+  try:
+    app.run(main)
+  finally:
+    time_consumption = time.time() - start
+    with open("time_consumption.txt", "w") as f:
+      f.write(f"Time consumption: {time_consumption:.2f} s\n")
+    print(f"Time consumption: {time_consumption:.2f} s (also saved to time_consumption.txt)")

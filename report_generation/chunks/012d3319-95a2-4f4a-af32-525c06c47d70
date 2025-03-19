@@ -1,0 +1,1 @@
+{"lc": 1, "type": "constructor", "id": ["langchain", "schema", "document", "Document"], "kwargs": {"metadata": {"source": "/home/guanzhideng145/research/ip_portal/patent_kg/patents/104-EP1908159(active).pdf"}, "page_content": "4\n\n7\n\nEP 1 908 159 B1\n\n8", "type": "Document"}}

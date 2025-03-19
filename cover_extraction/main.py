@@ -7,20 +7,36 @@ import fitz # pymupdf
 import json
 import re
 import numpy as np
-from models import Qwen25VL7B_dashscope, Qwen25VL7B_tgi, Qwen25VL7B_transformers
+from models import Qwen25VL7B_dashscope, Qwen25VL7B_tgi, Qwen25VL7B_transformers, DeepSeek_VL2_transformers
 from neo4j import GraphDatabase
 from configs import *
+import time
 
 FLAGS = flags.FLAGS
 
 def add_options():
   flags.DEFINE_string('input_dir', default = None, help = 'path to pdf')
-  flags.DEFINE_enum('api', default = 'transformers', enum_values = {'dashscope', 'transformers', 'tgi'}, help = 'which api to call')
+  flags.DEFINE_string('neo4j_db', default='testkg', help='neo4j database')
+  flags.DEFINE_enum('api', default = 'transformers', enum_values = {'dashscope', 'transformers', 'tgi', 'deepseek'}, help = 'which api to call')
   flags.DEFINE_enum('device', default = 'cuda', enum_values = {'cpu', 'cuda'}, help = 'device to use')
+
+
+def extract_json(text):
+  """ 提取 response 中的最后一个 JSON 结构 """
+  matches = re.findall(r"\{.*?\}", text, re.DOTALL)  # 查找所有 JSON 结构
+  if matches:
+    json_str = matches[-1]  # 选择最后一个匹配项
+    try:
+      return json.loads(json_str)  # 解析 JSON
+    except json.JSONDecodeError as e:
+      print(f"⚠️ JSON 解析失败: {e}\n尝试修复 JSON")
+      return None
+  return None
 
 def main(unused_argv):
   driver = GraphDatabase.driver(neo4j_host, auth = (neo4j_user, neo4j_password))
-  pattern = r'```json(.*?)```|```(.*?)```'
+  # pattern = r'```json(.*?)```|```(.*?)```'
+  pattern = r'```json\s*(\{.*?\})\s*```|(\{.*?\})'
   for root, subFolders, files in walk(FLAGS.input_dir):
     for file in files:
       stem, ext = splitext(file)
@@ -35,14 +51,16 @@ def main(unused_argv):
       elif pix.n == 4: img = img.reshape(pix.height, pix.width, 4)
       # 2) call vqa model to extract
       if FLAGS.api == 'transformers':
-        model = Qwen25VL7B_transformers(huggingface_api_key)
+        model = Qwen25VL7B_transformers(huggingface_token)
       elif FLAGS.api == 'dashscope':
         model = Qwen25VL7B_dashscope(dashscope_api_key)
       elif FLAGS.api == 'tgi':
         model = Qwen25VL7B_tgi(tgi_host)
+      elif FLAGS.api == 'deepseek':
+        model = DeepSeek_VL2_transformers(huggingface_token)
       else:
         raise Exception('unknown api!')
-      response = model.inference("""the given picture is the cover of a patent. please extract the information of the patent in the following json format:
+      prompt = """the given picture is the cover of a patent. please extract the information of the patent in the following json format:
 
 {
   "patent_num": <patent id>,
@@ -52,28 +70,70 @@ def main(unused_argv):
   "assignee": <assignee name in string format>,
   "cited_patents": [<cited patent num1>, <cited patent num2>, ...],
   "fields of classification search": [<field1>, <field2>]
-}""", img)
-      matches = re.findall(pattern, response, re.DOTALL)
-      if len(matches) < 1: continue
+}
+
+During the extraction process, use "City University of Hong Kong" to replace alias such as "City University of Hong Kong (HK)",
+"City University of Hong Kong, Kowloon (HK)", "City University of Hong Kong, Hong Kong (CN)", "香港城市大学", or any other 
+name that refers to City University of Hong Kong."""
+
       try:
-        info = json.loads(matches[0][0])
-      except:
+        response = model.inference(prompt, img)
+        print(f"VQA: {response}")
+      except Exception as e:
+        print(f"VQA 处理失败：{e}")
+
+      if FLAGS.api != 'deepseek':
+        matches = re.findall(pattern, response, re.DOTALL)
+        if len(matches) < 1:
+          print("未找到有效JSON结构")
+          continue
+
+        # 解析 JSON，确保 `info` 不为空
+        info = None
+        try:
+          info = json.loads(matches[0][0])
+          print("解析出的专利信息:", json.dumps(info, indent=2, ensure_ascii=False))
+        except Exception as e:
+          print(f"JSON 解析失败: {e}")
+          continue
+
+      else:
+        info = extract_json(response)
+
+      print(f"INFO: {info}")
+
+      if not info or 'patent_num' not in info or 'patent_name' not in info or info['patent_num'] is None or info['patent_name'] is None:
+        print("JSON 数据不完整，跳过")
         continue
-    driver.execute_query('merge (a: Patent {patent_num: $pno, patent_name: $pnm}) return a;', pno = info['patent_num'], pnm = info['patent_name'], database_ = neo4j_db)
-    if 'applicant' in info:
-      driver.execute_query('merge (a: Applicant {name: $name}) return a;', name = info['applicant'], database_ = neo4j_db)
-      driver.execute_query('match (a: Patent {patent_num: $pno}), (b: Applicant {name: $name}) merge (a)<-[:APPLY]-(b);', pno = info['patent_num'], pnm = info['patent_name'], database_ = neo4j_db)
-    if 'inventors' in info and len(info['inventors']):
-      for inventor in info['inventors']:
-        driver.execute_query('merge (a: Inventor {name: $name}) return a;', name = inventor, database_ = neo4j_db)
-        driver.execute_query('match (a: Patent {patent_num: $pno}), (b: Inventor {name: $name}) merge (a)<-[:INVENT]-(b);', pno = info['patent_num'], name = inventor, database_ = neo4j_db)
-    if 'assignee' in info:
-      driver.execute_query('merge (a: Assignee {name: $name}) return a;', name = info['assignee'], database_ = neo4j_db)
-    if 'fields' in info and len(info['fields']):
-      for field in info['fields']:
-        driver.execute_query('merge (a: Field {name: $name}) return a;', name = field, database_ = neo4j_db)
-        driver.execute_query('match (a: Patent {patent_num: $pno}), (b: Field {name: $name}) merge (a)-[:BELONGS_TO]-(b);', pno = info['patent_num'], name = field, database_ = neo4j_db)
+
+      print(f"✅ 存入 Neo4j: {info['patent_num']} - {info['patent_name']}")
+
+      driver.execute_query('merge (a: Patent {patent_num: $pno, patent_name: $pnm}) return a;', pno = info['patent_num'], pnm = info['patent_name'], database_ = FLAGS.neo4j_db)
+      if 'applicant' in info and info['applicant']:
+        driver.execute_query('merge (a: Applicant {name: $name}) return a;', name = info['applicant'], database_ = FLAGS.neo4j_db)
+        driver.execute_query('match (a: Patent {patent_num: $pno}), (b: Applicant {name: $name}) merge (a)<-[:APPLY]-(b);', pno = info['patent_num'], name = info['applicant'], database_ = FLAGS.neo4j_db)
+      if 'inventors' in info and len(info['inventors']):
+        for inventor in info['inventors']:
+          driver.execute_query('merge (a: Inventor {name: $name}) return a;', name = inventor, database_ = FLAGS.neo4j_db)
+          driver.execute_query('match (a: Patent {patent_num: $pno}), (b: Inventor {name: $name}) merge (a)<-[:INVENT]-(b);', pno = info['patent_num'], name = inventor, database_ = FLAGS.neo4j_db)
+      if 'assignee' in info and info['assignee']:
+        driver.execute_query('merge (a: Assignee {name: $name}) return a;', name = info['assignee'], database_ = FLAGS.neo4j_db)
+        driver.execute_query(
+          'match (a: Assignee {name: $name}), (b: Patent {patent_num: $pno}) merge (a)<-[:ASSIGN]-(b);',
+          name=info['assignee'], pno=info['patent_num'], database_=FLAGS.neo4j_db)
+      if 'fields' in info and len(info['fields']):
+        for field in info['fields']:
+          driver.execute_query('merge (a: Field {name: $name}) return a;', name = field, database_ = FLAGS.neo4j_db)
+          driver.execute_query('match (a: Patent {patent_num: $pno}), (b: Field {name: $name}) merge (a)-[:BELONGS_TO]-(b);', pno = info['patent_num'], name = field, database_ = FLAGS.neo4j_db)
 
 if __name__ == "__main__":
+  start = time.time()
   add_options()
-  app.run(main)
+
+  try:
+    app.run(main)
+  finally:
+    time_consumption = time.time() - start
+    with open("time_consumption.txt", "w") as f:
+      f.write(f"Time consumption: {time_consumption:.2f} s\n")
+    print(f"Time consumption: {time_consumption:.2f} s (also saved to time_consumption.txt)")

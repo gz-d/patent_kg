@@ -1,0 +1,1 @@
+{"lc": 1, "type": "constructor", "id": ["langchain", "schema", "document", "Document"], "kwargs": {"metadata": {"source": "/home/guanzhideng145/research/ip_portal/patent_kg/patents/1235_US20240143524A1.pdf"}, "page_content": "The NTT transformation module 102A may be\n\n[0085]", "type": "Document"}}
