@@ -22,14 +22,13 @@ def add_options():
 
 
 def extract_json(text):
-  """ 提取 response 中的最后一个 JSON 结构 """
-  matches = re.findall(r"\{.*?\}", text, re.DOTALL)  # 查找所有 JSON 结构
+  matches = re.findall(r"\{.*?\}", text, re.DOTALL)
   if matches:
-    json_str = matches[-1]  # 选择最后一个匹配项
+    json_str = matches[-1] 
     try:
-      return json.loads(json_str)  # 解析 JSON
+      return json.loads(json_str)
     except json.JSONDecodeError as e:
-      print(f"⚠️ JSON 解析失败: {e}\n尝试修复 JSON")
+      print(f"⚠️ JSONDecodeError {e}\nTry repairing JSON")
       return None
   return None
 
@@ -71,30 +70,26 @@ def main(unused_argv):
   "cited_patents": [<cited patent num1>, <cited patent num2>, ...],
   "fields of classification search": [<field1>, <field2>]
 }
-
-During the extraction process, use "City University of Hong Kong" to replace alias such as "City University of Hong Kong (HK)",
-"City University of Hong Kong, Kowloon (HK)", "City University of Hong Kong, Hong Kong (CN)", "香港城市大学", or any other 
-name that refers to City University of Hong Kong."""
+"""
 
       try:
         response = model.inference(prompt, img)
         print(f"VQA: {response}")
       except Exception as e:
-        print(f"VQA 处理失败：{e}")
+        print(f"VQA failed：{e}")
 
       if FLAGS.api != 'deepseek':
         matches = re.findall(pattern, response, re.DOTALL)
         if len(matches) < 1:
-          print("未找到有效JSON结构")
+          print("Couldn't find valid JSON")
           continue
 
-        # 解析 JSON，确保 `info` 不为空
         info = None
         try:
           info = json.loads(matches[0][0])
-          print("解析出的专利信息:", json.dumps(info, indent=2, ensure_ascii=False))
+          print("Decoded patent information", json.dumps(info, indent=2, ensure_ascii=False))
         except Exception as e:
-          print(f"JSON 解析失败: {e}")
+          print(f"JSONDecodeError: {e}")
           continue
 
       else:
@@ -103,10 +98,10 @@ name that refers to City University of Hong Kong."""
       print(f"INFO: {info}")
 
       if not info or 'patent_num' not in info or 'patent_name' not in info or info['patent_num'] is None or info['patent_name'] is None:
-        print("JSON 数据不完整，跳过")
+        print("JSON not complete，skip")
         continue
 
-      print(f"✅ 存入 Neo4j: {info['patent_num']} - {info['patent_name']}")
+      print(f"✅ Saving into Neo4j: {info['patent_num']} - {info['patent_name']}")
 
       driver.execute_query('merge (a: Patent {patent_num: $pno, patent_name: $pnm}) return a;', pno = info['patent_num'], pnm = info['patent_name'], database_ = FLAGS.neo4j_db)
       if 'applicant' in info and info['applicant']:
