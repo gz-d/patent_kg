@@ -28,20 +28,13 @@ def add_options():
 def main(unused_argv):
   driver = GraphDatabase.driver(neo4j_host, auth=(neo4j_user, neo4j_password))
   pattern = r'```json\s*(\{.*?\})\s*```|(\{.*?\})'
-  # prompt = extract_triplets_template(node_types, rel_types)
   llm = {
     'llama3': Llama3_2,
     # 'qwen2': Qwen2_5
     'qwen2': Qwen2,
     'deepseek': DeepSeekR1Qwen15B,
   }[FLAGS.model]()
-  # graph_transformer = LLMGraphTransformer(
-  #   llm = llm,
-  #   prompt = prompt,
-  #   allowed_nodes = node_types,
-  #   allowed_relationships = rel_types,
-  # )
-  # neo4j = Neo4jGraph(url = neo4j_host, username = neo4j_user, password = neo4j_password, database = FLAGS.neo4j_db)
+  
   if FLAGS.split:
     text_splitter = RecursiveCharacterTextSplitter(separators = [r"\n\n", r"\n", r"\.(?![0-9])|(?<![0-9])\.", r"。"], is_separator_regex = True, chunk_size = 150, chunk_overlap = 10)
   for root, dirs, files in tqdm(walk(FLAGS.input_dir)):
@@ -60,8 +53,7 @@ def main(unused_argv):
         docs = text_splitter.split_documents(docs)
       patent_text = "\n".join([doc.page_content for doc in docs])
       print(patent_text)
-      # graph = graph_transformer.convert_to_graph_documents(docs)
-      # neo4j.add_graph_documents(graph)
+      
       prompt = """The given text is the text of a patent, extracted by OCR. Please extract the information of the patent in the following json format:
 
       {
@@ -74,38 +66,26 @@ def main(unused_argv):
         "fields of classification search": [<field1>, <field2>]
       }
 
-      During the extraction process, use "City University of Hong Kong" to replace alias such as "City University of Hong Kong (HK)",
-      "City University of Hong Kong, Kowloon (HK)", "City University of Hong Kong, Hong Kong (CN)", "香港城市大学", or any other 
-      name that refers to City University of Hong Kong."""
+      """
       try:
         response = llm.inference(patent_text, prompt)
         print(f"OCR+LLM: {response}")
       except Exception as e:
-        print(f"OCR+LLM 处理失败：{e}")
+        print(f"OCR+LLM failed：{e}")
 
-      # matches = re.findall(pattern, response, re.DOTALL)
-      # print(matches)
-      # if len(matches) < 1:
-      #   print("未找到有效JSON结构")
-      #   continue
-
-      # 解析 JSON，确保 `info` 不为空
       info = None
       try:
-        # info = json.loads(matches[0][0])
         info = json.loads(response)
-        # print(type(info))
-        # print(info)
-        print("解析出的专利信息:", json.dumps(info, indent=2, ensure_ascii=False))
+        print("Decoded patent info", json.dumps(info, indent=2, ensure_ascii=False))
       except Exception as e:
-        print(f"JSON 解析失败: {e}")
+        print(f"JSONDecodeError: {e}")
         continue
 
       if not info or 'patent_num' not in info or 'patent_name' not in info or info['patent_num'] is None or info['patent_name'] is None:
-        print("JSON 数据不完整，跳过")
+        print("JSON incomplete，skip")
         continue
 
-      print(f"✅ 存入 Neo4j: {info['patent_num']} - {info['patent_name']}")
+      print(f"✅ Saving into Neo4j: {info['patent_num']} - {info['patent_name']}")
 
       driver.execute_query('merge (a: Patent {patent_num: $pno, patent_name: $pnm}) return a;', pno=info['patent_num'],
                            pnm=info['patent_name'], database_=FLAGS.neo4j_db)
